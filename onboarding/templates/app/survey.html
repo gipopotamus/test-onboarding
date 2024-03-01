@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Опрос</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1 id="survey-title">Опрос</h1>
+    <div id="questions-container"></div>
+    <button id="next-button">Далее</button>
+
+    <script>
+        let currentSection = '{{ section_title }}';
+        let surveySessionId = '{{ survey_session_id }}';
+        let surveyId = '{{ survey_id }}';
+
+        function loadSection(section) {
+            $.ajax({
+                url: `/survey/${surveyId}/${surveySessionId}/${section}/`,
+                type: 'get',
+                success: function(response) {
+                    $('#questions-container').empty();
+                    response.questions.forEach(question => {
+                        let questionHtml = `<p>${question.text}</p>`;
+        if (question.type === 'choice') {
+            let choices = question.choice_options.split(', ');
+            choices.forEach(choice => {
+                questionHtml += `<input type="radio" name="question_${question.id}" value="${choice.trim()}"> ${choice.trim()}<br>`;
+                    });
+                    } else {
+                        questionHtml += `<input type="text" name="question_${question.id}"><br>`;
+                    }
+                        $('#questions-container').append(questionHtml);
+                    });
+                    currentSection = section;
+                }
+            });
+        }
+
+        $('#next-button').click(function() {
+            let answers = {};
+             // Сбор данных из текстовых полей
+            $("#questions-container input[type='text']").each(function() {
+                answers[$(this).attr("name")] = $(this).val();
+            });
+
+            // Сбор данных из радиокнопок (учитываются только выбранные)
+            $("#questions-container input[type='radio']:checked").each(function() {
+                answers[$(this).attr("name")] = $(this).val();
+            });
+            console.log("Answers data:", answers);
+            $.ajax({
+                url: `/survey/${surveyId}/${surveySessionId}/${currentSection}/`,
+                type: 'post',
+                data: answers,
+                success: function(response) {
+                    if (response.next_section === 'Finish') {
+                        alert('Опрос завершен!');
+                        $('#questions-container').empty();
+                        $('#next-button').hide();
+                    } else {
+                        loadSection(response.next_section);
+                    }
+                }
+            });
+        });
+
+        $(document).ready(function() {
+            loadSection(currentSection);
+        });
+    </script>
+</body>
+</html>
